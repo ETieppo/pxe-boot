@@ -7,7 +7,7 @@ Built and tested on macOS (Apple Silicon) booting an Avell laptop with Insyde UE
 
 ## Why this exists
 
-If you ever wipe your `/dev` thinking you were unmounting a disk (it happens), and your
+If you ever wipe your `/dev` thinking you were listing files at disk unmmount (it happens), and your
 only spare machine is a Mac with no USB pendrive in sight, this gets you back into a
 working Arch live environment in a few minutes.
 
