@@ -1,0 +1,14 @@
+iso/arch/
+iso/EFI/
+iso/boot/
+iso/loader/
+iso/shellx64.efi
+iso/boot.ipxe
+tftp/arch/
+tftp/EFI/
+tftp/ipxe.efi
+tftp/loader/
+grub-tmp/
+*.iso
+*.sfs
+*.img
