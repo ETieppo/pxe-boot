@@ -1,36 +1,36 @@
 #!/bin/bash
-# Sobe dnsmasq como proxy DHCP + TFTP server na interface en5
-# Necessário pra Avell descobrir o servidor PXE
+# Run dnsmasq as DHCP proxy + TFTP server at en5 interface
+# target will seek for this server port and endpoints to download files into
 
-set -e
+set -euo pipefail
+
 PXE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_IP="192.168.99.1"
 DNSMASQ_BIN="/opt/homebrew/opt/dnsmasq/sbin/dnsmasq"
 CONF_FILE="/opt/homebrew/etc/dnsmasq.conf"
 
 if [ ! -x "$DNSMASQ_BIN" ]; then
-  echo "ERRO: dnsmasq não encontrado em $DNSMASQ_BIN"
-  echo "Rode ./setup.sh primeiro."
+  echo "[ERROR]: dnsmasq was not found at $DNSMASQ_BIN"
+  echo "Run ./setup.sh first."
   exit 1
 fi
 
 if [ ! -f "$CONF_FILE" ]; then
-  echo "ERRO: $CONF_FILE não existe. Rode ./setup.sh primeiro."
+  echo "[ERROR]: $CONF_FILE do not exist. Run ./setup.sh first."
   exit 1
 fi
 
-# Confere se en5 tá com o IP esperado
+# Ensure right en5 IP
 if ! ifconfig en5 2>/dev/null | grep -q "inet $SERVER_IP"; then
-  echo "AVISO: en5 não está com IP $SERVER_IP."
-  echo "Configure com:"
+  echo "[WARN]: en5 IP need to be $SERVER_IP."
+  echo "configure with:"
   echo "  sudo networksetup -setmanual \"USB 10/100/1000 LAN\" $SERVER_IP 255.255.255.0 \"\""
   exit 1
 fi
 
-# Mata instâncias anteriores
+# kill last instance
 sudo killall dnsmasq 2>/dev/null || true
 sleep 1
 
-echo "Sobindo dnsmasq (DHCP+TFTP) em en5..."
-echo "Ctrl+C pra parar"
+echo "Starting dnsmasq (DHCP+TFTP) at en5..."
 exec sudo "$DNSMASQ_BIN" -d --log-debug --log-dhcp --conf-file="$CONF_FILE"

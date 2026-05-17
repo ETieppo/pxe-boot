@@ -43,6 +43,10 @@ Set a static IP on the USB interface:
 
 ```bash
 sudo networksetup -setmanual "USB 10/100/1000 LAN" 192.168.99.1 255.255.255.0 ""
+sudo launchctl unload -w /System/Library/LaunchDaemons/bootps.plist
+sudo launchctl disable system/com.apple.tftpd
+sudo launchctl disable system/com.apple.bootpd
+sudo launchctl kickstart -k system/com.apple.bootpd
 ```
 
 In separate terminals, run:

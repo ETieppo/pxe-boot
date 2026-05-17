@@ -1,6 +1,5 @@
 #!/bin/bash
-# setup.sh — Prepara o Mac para servir Arch Linux via PXE
-# Roda uma vez antes da primeira utilização
+# prepare macos for serve pxe
 
 set -e
 
@@ -13,41 +12,47 @@ NETMASK="255.255.255.0"
 echo "=== PXE Arch Linux setup ==="
 echo "Diretório base: $PXE_DIR"
 
-# 1. Dependências
+# 1. Mac dependencies
 echo
-echo "[1/6] Instalando dependências (dnsmasq, pv)..."
+echo "[1/6] installing dependencies (dnsmasq, pv)..."
 if ! command -v brew >/dev/null 2>&1; then
-  echo "ERRO: Homebrew não está instalado. Instale primeiro: https://brew.sh"
+  echo "[ERROR]: brew command not found, install it https://brew.sh"
   exit 1
 fi
 brew list dnsmasq >/dev/null 2>&1 || brew install dnsmasq
 brew list pv >/dev/null 2>&1 || brew install pv
 
-# 2. Extrai ISO do Arch (se fornecida e ainda não extraída)
+sudo networksetup -setmanual "USB 10/100/1000 LAN" 192.168.99.1 255.255.255.0 ""
+sudo launchctl unload -w /System/Library/LaunchDaemons/bootps.plist
+sudo launchctl kickstart -k system/com.apple.bootpd
+sudo launchctl disable system/com.apple.tftpd
+sudo launchctl disable system/com.apple.bootpd
+
+# 2. Extract Arch ISO
 if [ -n "$ISO_FILE" ] && [ -f "$ISO_FILE" ]; then
   if [ ! -d "$PXE_DIR/iso/arch" ]; then
     echo
-    echo "[2/6] Extraindo $ISO_FILE..."
+    echo "[2/6] extracting $ISO_FILE..."
     mkdir -p "$PXE_DIR/iso"
     bsdtar -xf "$ISO_FILE" -C "$PXE_DIR/iso/"
   else
     echo
-    echo "[2/6] ISO já extraída em $PXE_DIR/iso (pulando)"
+    echo "[2/6] ISO already extracted $PXE_DIR/iso (skip)"
   fi
 else
   if [ ! -d "$PXE_DIR/iso/arch" ]; then
     echo
-    echo "ERRO: passe a ISO como argumento na primeira execução."
-    echo "Uso: $0 /caminho/para/archlinux-xxxx.iso"
+    echo "[ERROR]: run with ISO path args."
+    echo "use: $0 /caminho/para/archlinux-xxxx.iso"
     exit 1
   fi
   echo
-  echo "[2/6] ISO já extraída (pulando)"
+  echo "[2/6] ISO already extracted (skip)"
 fi
 
-# 3. Monta TFTP root
+# 3. mount tftp root
 echo
-echo "[3/6] Montando estrutura TFTP..."
+echo "[3/6] Mounting TFTP..."
 mkdir -p "$PXE_DIR/tftp/EFI/BOOT"
 mkdir -p "$PXE_DIR/tftp/arch/boot/x86_64"
 mkdir -p "$PXE_DIR/tftp/loader/entries"
@@ -55,20 +60,20 @@ cp -f "$PXE_DIR/iso/EFI/BOOT/BOOTx64.EFI" "$PXE_DIR/tftp/EFI/BOOT/"
 cp -f "$PXE_DIR/iso/arch/boot/x86_64/vmlinuz-linux" "$PXE_DIR/tftp/arch/boot/x86_64/"
 cp -f "$PXE_DIR/iso/arch/boot/x86_64/initramfs-linux.img" "$PXE_DIR/tftp/arch/boot/x86_64/"
 
-# 4. Baixa iPXE vanilla
+# 4. download vanilla ipxe
 echo
-echo "[4/6] Baixando iPXE (vanilla, sem script embutido)..."
+echo "[4/6] Downloading vanilla IPXE..."
 if [ ! -s "$PXE_DIR/tftp/ipxe.efi" ] || [ "$(stat -f%z "$PXE_DIR/tftp/ipxe.efi" 2>/dev/null || echo 0)" -lt 100000 ]; then
   curl -fL -o "$PXE_DIR/tftp/ipxe.efi" https://boot.ipxe.org/x86_64-efi/ipxe.efi
 fi
 if ! file "$PXE_DIR/tftp/ipxe.efi" | grep -q "PE32"; then
-  echo "ERRO: ipxe.efi inválido (não é PE32). Confira conectividade."
+  echo "[ERROR]: invalid ipxe.efi (is not PE32). ensure connectivity."
   exit 1
 fi
 
-# 5. Gera boot.ipxe servido via HTTP
+# 5. generate boot.ipxe via HTTP serve
 echo
-echo "[5/6] Gerando boot.ipxe..."
+echo "[5/6] generating boot.ipxe..."
 cat > "$PXE_DIR/iso/boot.ipxe" <<EOF
 #!ipxe
 echo === Arch Linux Netboot ===
@@ -78,13 +83,13 @@ kernel http://$\{SERVER_IP\}:8000/arch/boot/x86_64/vmlinuz-linux archisobasedir=
 initrd http://$\{SERVER_IP\}:8000/arch/boot/x86_64/initramfs-linux.img
 boot
 :failed
-echo Falhou.
+echo failed.
 shell
 EOF
 
-# 6. Gera dnsmasq.conf
+# 6. gen dnsmasq.conf
 echo
-echo "[6/6] Gerando dnsmasq.conf..."
+echo "[6/6] generating dnsmasq.conf..."
 sudo tee /opt/homebrew/etc/dnsmasq.conf >/dev/null <<EOF
 port=0
 interface=en5
@@ -103,16 +108,20 @@ log-queries
 EOF
 
 echo
-echo "=== Setup concluído ==="
+echo "=== END SETUP ==="
 echo
-echo "Próximos passos pra bootar a Avell:"
-echo "  1. Conecte o adaptador USB-Ethernet (Baseus) e cabo direto na Avell"
-echo "  2. Configure IP estático no en5:"
-echo "       sudo networksetup -setmanual \"$ETH_SERVICE\" $SERVER_IP $NETMASK \"\""
-echo "  3. Em terminais separados, rode:"
-echo "       ./start-dnsmasq.sh"
+echo "NEXT STEPS:"
+echo "  1. Connect USB-Ethernet between Mac and target computer"
+echo "  2. If something went wrong, run manually: "
+echo "        sudo networksetup -setmanual \"$ETH_SERVICE\" $SERVER_IP $NETMASK \"\""
+echo "        sudo launchctl unload -w /System/Library/LaunchDaemons/bootps.plist "
+echo "        sudo launchctl kickstart -k system/com.apple.bootpd                 "
+echo "        sudo launchctl disable system/com.apple.tftpd                       "
+echo "        sudo launchctl disable system/com.apple.bootpd                      "
+echo "  3. Open two different terminals and run one line at each:"
+echo "      r ./start-dnsmasq.sh"
 echo "       ./start-http.sh"
-echo "  4. Liga a Avell, F7 -> IPv4 PXE Boot"
+echo "  4. Turn on target, open bios -> IPv4 PXE Boot"
 echo
-echo "Pra restaurar o Mac ao normal depois:"
+echo "To reconfigure default Mac runs:"
 echo "  sudo networksetup -setdhcp \"$ETH_SERVICE\""
